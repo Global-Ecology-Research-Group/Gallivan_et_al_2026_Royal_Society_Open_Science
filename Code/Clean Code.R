@@ -195,7 +195,7 @@ source_labels <- c(
 )
 
 
-# Create the map with custom facet labels and improved spacing
+# Create the map with custom facet labels and improved spacing (Figure_1)
 Fig_1_Map <- ggplot(fl_counties) +
   geom_sf(aes(fill = total_obs), color = "black") +
   scale_fill_viridis_c(
@@ -289,6 +289,7 @@ iNatandEddMap_both %>%
        y = "Count",
        fill = "Platform") +
   theme_classic()
+
 
 ggsave("Figures/hist_num_of_obs.jpeg", height=5, width=6, units="in")
 
@@ -559,8 +560,8 @@ trait_inat_eddmaps <- trait_inat_eddmaps %>%
 # let's filter out the other data types
 trait_inat_eddmaps_prep <- trait_inat_eddmaps %>%
   dplyr::select(species, inat_number_of_obs, eddmaps_number_of_obs, 
-         `Habitat type`, `Active time`, `Maximum body mass (g)`,
-         Diu, Noc, Crepu, Body_mass_g, Fos, Ter, Aqu, Arb) 
+                `Habitat type`, `Active time`, `Maximum body mass (g)`,
+                Diu, Noc, Crepu, Body_mass_g, Fos, Ter, Aqu, Arb) 
 
 trait_inat_eddmaps_clean <- trait_inat_eddmaps_prep %>%
   mutate(
@@ -696,15 +697,15 @@ coefs <- coefs %>%
 
 # Coefficient plot with Nocturnal in blue
 (coef_activity <- ggplot(coefs, aes(x = Activity, y = Estimate)) +
-  geom_point(size = 4) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  scale_color_identity() +  # use the actual colors in the column
-  labs(
-    x = "Activity period",
-    y = "Log-proportional ratio of observations\n(iNaturalist / EDDMapS)"
-  ) +
-  theme_classic(base_size = 14))
+    geom_point(size = 4) +
+    geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    scale_color_identity() +  # use the actual colors in the column
+    labs(
+      x = "Activity period",
+      y = "Log-proportional ratio of observations\n(iNaturalist / EDDMapS)"
+    ) +
+    theme_classic(base_size = 14))
 
 
 # log-transform body size since itis highly skewed
@@ -809,15 +810,15 @@ trait_habitat_long <- trait_habitat %>%
 
 # Plot
 (habitat <- ggplot(trait_habitat_long, aes(x = Habitat, y = prop_ratio)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +  # reference line
-  labs(
-    y = "Log-proportional ratio of observations\n(iNaturalist / EDDMapS)",
-    x = "Habitat type",
-    title="C."
-  ) +
-  theme_classic(base_size = 14) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)))
+    geom_boxplot() +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +  # reference line
+    labs(
+      y = "Log-proportional ratio of observations\n(iNaturalist / EDDMapS)",
+      x = "Habitat type",
+      title="C."
+    ) +
+    theme_classic(base_size = 14) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)))
 
 # make a coefficient plot
 # Get coefficients and SEs
@@ -1241,7 +1242,7 @@ ggplot(long_data, aes(x = platform, y = mcp_area)) +
 # make a histogram of data
 ggplot(long_data, aes(x = mcp_area)) +
   geom_histogram(position = "identity", alpha = 0.35, bins = 50) +
-    labs(x = "MCP Area (km²)",
+  labs(x = "MCP Area (km²)",
        y = "Count") +
   theme_classic()
 
@@ -1272,6 +1273,8 @@ long_data <- long_data %>%
     ),
     log_obs_count = log10(obs_count)
   )
+
+# Figure_S12
 
 ggplot(long_data, aes(x = obs_count)) +
   geom_histogram(position = "identity", alpha = 0.35, bins = 50) +
@@ -1364,7 +1367,7 @@ ggplot(long_data, aes(x = log_obs_count, y = log_mcp_area, color = platform)) +
 
 
 
-# Supplemental figure for MCP
+# Supplemental Figure_S12
 
 plot_data_combined <- long_data %>%
   filter(!is.na(mcp_area) & !is.na(obs_count)) %>%
@@ -1468,7 +1471,7 @@ plot_df <- plot_df %>%
     yj = if_else(y_plot == epsilon, epsilon * 10^(runif(n(), 0, floor_jit)), y_plot * jy)
   )
 
-# ------- Plot (regression line ONLY on "Both platforms") -------
+# ------- Figure_1 Linegraph -------
 Fig_1_Line_with_platforms <- ggplot() +
   geom_point(
     data = plot_df,
