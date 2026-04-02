@@ -6,6 +6,8 @@ This folder contains all R scripts which can be used to repeat the results prese
 
 **Get_source_for_species_status –** Script to define species as native or non-native using multiple sources and downloading data for species distribution from the Reptile Database.
 
+**Clean Code** - Main script used in the conduction of the manuscript comparing non-native herpetofauna across EDDMapS and iNaturalist. This script contains all data curation, main analyses, and figure generation.
+
 # Data
 
 This folder contains all data used in the analyses. The following is a description of data present in this repository:
