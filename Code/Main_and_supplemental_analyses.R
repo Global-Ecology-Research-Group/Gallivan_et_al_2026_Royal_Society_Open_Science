@@ -31,7 +31,7 @@ iNat <- readRDS("Data/iNat_herp_data.RDS")
 
 # remove native species
 filtered_data_iNat <- iNat %>%
-  filter(species %in% iNaturalist_introduced$Species) 
+  filter(species %in% iNaturalist_introduced$scientific_name) 
 
 # clean up the data
 filtered_data_iNat <- filtered_data_iNat %>%
@@ -76,7 +76,7 @@ cat("EDDMapS introduced-only rows (pre): ", nrow(eddmaps_introduced_pre), "\n")
 cat("EDDMapS iNat-crossposts detected (pre): ", nrow(eddmaps_crossposts_pre), "\n")
 cat("EDDMapS rows after removing crossposts: ", nrow(filtered_data_eddmaps), "\n\n")
 
-### Select the columns relavent to MCPs
+# Select the columns relavent to MCPs
 filtered_data_eddmaps <- filtered_data_eddmaps %>%
   dplyr::select(SciName, ObsDate, Latitude, Longitude, CoordAcc) %>%
   mutate(coordinateUncertaintyInMeters = as.numeric(as.character(CoordAcc))) %>%
@@ -339,7 +339,7 @@ write_csv(presence_df, "Data/species_presence.csv")
 
 # Pie chart for figure 1
 
-presence_summary <- presence_df2 %>%
+presence_summary <- presence_df %>%
   mutate(
     Category = case_when(
       iNaturalist == "Yes" & EDDMapS == "Yes" ~ "Both platforms",
