@@ -208,7 +208,7 @@ Fig_1_Map <- ggplot(fl_counties) +
     na.value = "gray80"
   ) +
   facet_wrap(~source, labeller = labeller(source = source_labels)) +
-  theme_classic() +
+  theme_classic(base_size = 16) +
   theme(
     axis.text.x = element_text(size = 11),
     axis.text.y = element_text(size = 11),
@@ -441,7 +441,7 @@ Fig_1_Line_with_platforms <- ggplot() +
     x = "iNaturalist observations",
     y = "EDDMapS observations"
   ) +
-  theme_classic() +
+  theme_classic(base_size = 16) +
   theme(legend.position = "none")   # <- drop legend
 
 Fig_1_Line_with_platforms
@@ -995,7 +995,7 @@ coefs <- coefs %>%
 # use patchwork to make a nice, combined figure
 (coef_activity + body_size) / coef_habitat
 
-ggsave("Figures/species_traists_platform.jpeg", height=8, width=8, units="in")
+ggsave("Figures/Figure_2.jpeg", height=8, width=10, units="in")
 
 
 # Objective 2 -------------------------------------------------------------
@@ -1833,3 +1833,4 @@ qqline(resid(mcp_obs_model))
 
 # Likelihood ratio test: does interaction improve fit?
 anova(grid_obs_model, grid_interaction_model)
+
