@@ -208,7 +208,7 @@ Fig_1_Map <- ggplot(fl_counties) +
     na.value = "gray80"
   ) +
   facet_wrap(~source, labeller = labeller(source = source_labels)) +
-  theme_classic(base_size = 16) +
+  theme_classic(base_size = 24) +
   theme(
     axis.text.x = element_text(size = 11),
     axis.text.y = element_text(size = 11),
@@ -801,7 +801,7 @@ glm_diurnal <- glm(prop_ratio ~ 1, data = subset(trait_inat_eddmaps_clean, `Acti
 summary(glm_diurnal)
 
 # Figure_S3
-png("Figures/DHARMa_residuals_diurnal.png", width = 2000, height = 1500, res = 300)
+png("Figures/Supplemental Figures/DHARMa_residuals_diurnal.png", width = 2000, height = 1500, res = 300)
 res <- simulateResiduals(glm_diurnal)
 plot(res)
 dev.off()
@@ -810,7 +810,7 @@ dev.off()
 glm_nocturnal <- glm(prop_ratio ~ 1, data = subset(trait_inat_eddmaps_clean, `Active time` == "Nocturnal"))
 summary(glm_nocturnal)
 
-png("Figures/DHARMa_residuals_nocturnal.png", width = 2000, height = 1500, res = 300)
+png("Figures/Supplemental Figures/DHARMa_residuals_nocturnal.png", width = 2000, height = 1500, res = 300)
 res <- simulateResiduals(glm_nocturnal)
 plot(res)
 dev.off()
@@ -819,7 +819,7 @@ dev.off()
 glm_cathemeral <- glm(prop_ratio ~ 1, data = subset(trait_inat_eddmaps_clean, `Active time` == "Cathemeral"))
 summary(glm_cathemeral)
 
-png("Figures/DHARMa_residuals_cathemeral.png", width = 2000, height = 1500, res = 300)
+png("Figures/Supplemental Figures/DHARMa_residuals_cathemeral.png", width = 2000, height = 1500, res = 300)
 res <- simulateResiduals(glm_cathemeral)
 plot(res)
 dev.off()
@@ -861,7 +861,7 @@ body_mass_glm <- glm(prop_ratio ~ log_body_size, data=trait_inat_eddmaps_clean, 
 summary(body_mass_glm)
 plot(body_mass_glm)
 
-png("Figures/DHARMa_residuals_log_body_mass.png", width = 2000, height = 1500, res = 300)
+png("Figures/Supplemental Figures/DHARMa_residuals_log_body_mass.png", width = 2000, height = 1500, res = 300)
 res <- simulateResiduals(body_mass_glm)
 plot(res)
 dev.off()
@@ -870,7 +870,7 @@ body_mass_glm_nl <- glm(prop_ratio ~ `Maximum body mass (g)`, data=trait_inat_ed
 summary(body_mass_glm_nl)
 plot(body_mass_glm_nl)
 
-png("Figures/DHARMa_residuals_body_mass.png", width = 2000, height = 1500, res = 300)
+png("Figures/Supplemental Figures/DHARMa_residuals_body_mass.png", width = 2000, height = 1500, res = 300)
 res <- simulateResiduals(body_mass_glm_nl)
 plot(res)
 dev.off()
@@ -1119,7 +1119,7 @@ cat(sprintf("  AIC (raw PopDensity): %.2f\n", AIC(m_logit_raw)))
 cat(sprintf("  AIC (log PopDensity): %.2f\n", AIC(m_logit)))
 
 # Figure: density curves 
-# Figure_3
+# Figure 3
 p_density <- ggplot(PopData_obj2, aes(x = PopDensity, fill = Source)) +
   geom_density(alpha = 0.35) +
   scale_x_log10(labels = label_number()) +
@@ -1127,9 +1127,11 @@ p_density <- ggplot(PopData_obj2, aes(x = PopDensity, fill = Source)) +
   labs(x = "Population density (persons/km²; log10 x-axis)",
        y = "Density",
        fill = "Platform") +
-  theme_classic()
+  theme_classic(base_size=16)
 
 print(p_density)
+
+ggsave("Figures/Figure_3_up.jpeg", height=8, width=12, units="in")
 
 
 # Objective 3 -------------------------------------------------------------
@@ -1805,7 +1807,7 @@ summary(grid_obs_mixed_model)
 # check singular fits
 lme4::isSingular(grid_obs_mixed_model)
 
-png("Figures/Supplemental Files/DHARMa_grid_area_mm.png", width = 2000, height = 1500, res = 300)
+png("Figures/Supplemental Figures/DHARMa_grid_area_mm.png", width = 2000, height = 1500, res = 300)
 grid_mm <- simulateResiduals(grid_obs_mixed_model)
 plot(grid_mm)
 dev.off()

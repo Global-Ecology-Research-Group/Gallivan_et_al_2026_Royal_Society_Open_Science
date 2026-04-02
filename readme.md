@@ -6,13 +6,13 @@ This folder contains all R scripts which can be used to repeat the results prese
 
 **Get_source_for_species_status –** Script to define species as native or non-native using multiple sources and downloading data for species distribution from the Reptile Database.
 
-**Main_and_supplemental_analyses.R** - Main script used in the conduction of the manuscript comparing non-native herpetofauna across EDDMapS and iNaturalist. This script contains all data curation, main analyses, and figure generation. This code is organized to follow our manuscripts 3 main Objectives.
+**Main_and_supplemental_analyses.R** - Main script used to run all analysis and supplemental analyses presented in the paper. This script contains all data curation, main analyses, and figure generation. This code is organized to follow our manuscripts 3 main Objectives.
 
 # Data
 
 This folder contains all data used in the analyses. The following is a description of data present in this repository:
 
-**AmphiBIO_v1.csv** - Table containing all trait data for Amphibian species used within this study across Florida.
+**AmphiBIO_v1.csv** - Table containing all trait data for Amphibian species used within this study across Florida. Dataset citation: Oliveira, B. F., São-Pedro, V. A., Santos-Barrera, G., Penone, C., & Costa, G. C. (2017). AmphiBIO, a global database for amphibian ecological traits. Scientific data, 4(1), 1-7.
 
 **eddmaps_introduced.csv** - Table containing a list of all introduced Reptile and Amphibian species observed via EDDMapS within Florida.
 
@@ -20,7 +20,7 @@ This folder contains all data used in the analyses. The following is a descripti
 
 **fl_pop_density** - File containing the necessary population data to run Objective 2 analyses.
 
-**iNat_herp_data.RDS** - RDS file that contains all raw iNaturalist herpetofauna observations across Florida.
+**iNat_herp_data.RDS** - RDS file that contains all raw iNaturalist herpetofauna observations across Florida. Data citation: GBIF.org (29 August 2024) GBIF Occurrence Download <https://doi.org/10.15468/dl.cxtdyp>
 
 **iNaturalist_introduced.csv** - Table containing a list of all introduced Reptile and Amphibian species observed via iNaturalist.
 
@@ -34,7 +34,7 @@ This folder contains all data used in the analyses. The following is a descripti
 
 -   **Reptile_Database_Distribution:** The distribution of reptile species not found in other available datasets from The Reptile Database (<http://www.reptile-database.org/>).
 
-**RepTrait dataset V1-2_data.csv** - Table containing all trait data for Reptile species used in this study across Florida.
+**RepTrait dataset V1-2_data.csv** - Table containing all trait data for Reptile species used in this study across Florida. Data citation: Oskyrko, O., Mi, C., Meiri, S., & Du, W. (2024). ReptTraits: a comprehensive dataset of ecological traits in reptiles. Scientific Data, 11(1), 243.
 
 # Figures
 
