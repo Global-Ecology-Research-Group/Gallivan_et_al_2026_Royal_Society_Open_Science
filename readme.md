@@ -6,7 +6,7 @@ This folder contains all R scripts which can be used to repeat the results prese
 
 **Get_source_for_species_status –** Script to define species as native or non-native using multiple sources and downloading data for species distribution from the Reptile Database.
 
-**Clean Code** - Main script used in the conduction of the manuscript comparing non-native herpetofauna across EDDMapS and iNaturalist. This script contains all data curation, main analyses, and figure generation. This code is organized to follow our manuscripts 3 main Objectives
+**Main_and_supplemental_analyses.R** - Main script used in the conduction of the manuscript comparing non-native herpetofauna across EDDMapS and iNaturalist. This script contains all data curation, main analyses, and figure generation. This code is organized to follow our manuscripts 3 main Objectives.
 
 # Data
 
@@ -17,6 +17,8 @@ This folder contains all data used in the analyses. The following is a descripti
 **eddmaps_introduced.csv** - Table containing a list of all introduced Reptile and Amphibian species observed via EDDMapS within Florida.
 
 **EDDMapS_observations.csv** - Table containing all raw EDDMapS observations for all introduced Reptile and Amphibian individuals across Florida.
+
+**fl_pop_density** - File containing the necessary population data to run Objective 2 analyses.
 
 **iNat_herp_data.RDS** - RDS file that contains all raw iNaturalist herpetofauna observations across Florida.
 
