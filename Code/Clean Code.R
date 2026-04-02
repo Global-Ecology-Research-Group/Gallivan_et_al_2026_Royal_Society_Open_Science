@@ -1,5 +1,5 @@
 ### Clean Code
-### Map and Line Graph Figure 1 (Obj 1.)
+
 
 library(tidyverse)
 library(ggplot2)
@@ -14,6 +14,7 @@ library(patchwork)
 library(scales)
 library(car)
 library(DHARMa)
+library(lme4)
 
 iNaturalist_introduced <- read.csv("Data/iNaturalist_introduced.csv")
 eddmaps_introduced_clean <- read.csv("Data/eddmaps_introduced.csv")
@@ -195,6 +196,17 @@ source_labels <- c(
 )
 
 
+
+
+
+
+# ============================================================
+# Objective 1:
+#comprehensively compare the data available from iNaturalist and EDDMapS, and 
+#to determine how species traits may explain differences in species representation 
+#between platforms across all recorded non-native herpetofauna in Florida
+# ============================================================
+
 # Create the map with custom facet labels and improved spacing (Figure_1)
 Fig_1_Map <- ggplot(fl_counties) +
   geom_sf(aes(fill = total_obs), color = "black") +
@@ -375,12 +387,197 @@ ggplot(presence_summary, aes(x = "", y = n, fill = Category)) +
             position = position_stack(vjust = 0.5),
             size = 6)
 
+# ==============================================
+# Figure_1 Scatter Plot 
+# ==============================================
+
+# ------- Build per-species counts (Florida-filtered) -------
+iNat_counts <- filtered_data_iNat_florida %>%
+  count(species, name = "inat_n")
+
+EDD_counts <- filtered_data_eddmaps_florida %>%
+  count(species, name = "edd_n")
+
+counts <- full_join(iNat_counts, EDD_counts, by = "species")
+
+# ------- Assign platform category + build plotting coords -------
+epsilon <- 0.5  # axis floor for "absent" side on log scale
+
+plot_df <- counts %>%
+  mutate(
+    platform = case_when(
+      !is.na(inat_n) & !is.na(edd_n) ~ "Both platforms",
+      !is.na(inat_n) &  is.na(edd_n) ~ "iNaturalist only",
+      is.na(inat_n) & !is.na(edd_n) ~ "EDDMapS only",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(platform)) %>%
+  mutate(
+    x_plot = if_else(is.na(inat_n), epsilon, as.double(inat_n)),
+    y_plot = if_else(is.na(edd_n), epsilon, as.double(edd_n))
+  )
+
+# ------- Jitter settings (multiplicative in log space) -------
+set.seed(42)
+jitter_dex <- 0.05   # ±0.05 log10 units ≈ ±12%
+floor_jit  <- 0.10   # lift off axis floor (log10 units)
+
+plot_df <- plot_df %>%
+  mutate(
+    jx = 10^(runif(n(), -jitter_dex, jitter_dex)),
+    jy = 10^(runif(n(), -jitter_dex, jitter_dex)),
+    xj = if_else(x_plot == epsilon, epsilon * 10^(runif(n(), 0, floor_jit)), x_plot * jx),
+    yj = if_else(y_plot == epsilon, epsilon * 10^(runif(n(), 0, floor_jit)), y_plot * jy)
+  )
+
+# ------- Plot (regression line ONLY on "Both platforms") -------
+Fig_1_Line_with_platforms <- ggplot() +
+  geom_point(
+    data = plot_df,
+    aes(x = xj, y = yj, color = platform),
+    size = 2.6, alpha = 0.9
+  ) +
+  geom_smooth(
+    data = plot_df %>% filter(platform == "Both platforms"),
+    aes(x = x_plot, y = y_plot),
+    method = "lm", se = TRUE, color = "black"
+  ) +
+  scale_x_log10(limits = c(epsilon, NA)) +
+  scale_y_log10(limits = c(epsilon, NA)) +
+  scale_color_manual(
+    values = c(
+      "Both platforms" = "#7FB069",
+      "iNaturalist only" = "#A7FD25",
+      "EDDMapS only"     = "#FD7B25"
+    ),
+    name = NULL
+  ) +
+  labs(
+    x = "iNaturalist observations",
+    y = "EDDMapS observations"
+  ) +
+  theme_classic() +
+  theme(legend.position = "none")   # <- drop legend
+
+Fig_1_Line_with_platforms
 
 
+# ---- Choose species to highlight ----
+species_to_highlight <- c("Graptemys pseudogeographica", "Xenopus laevis")
+
+# Build a small table of those species from your per-species counts
+hl_raw <- counts %>%
+  filter(species %in% species_to_highlight)
+
+# If none found, bail early (optional)
+if (nrow(hl_raw) == 0) message("None of the highlight species were found in 'counts'.")
+
+# Compute plotted positions with same floor & multiplicative jitter you used above
+set.seed(101)  # separate seed for reproducible highlight positions
+hl_points <- hl_raw %>%
+  mutate(
+    x_plot = if_else(is.na(inat_n), epsilon, as.double(inat_n)),
+    y_plot = if_else(is.na(edd_n),  epsilon, as.double(edd_n)),
+    jx     = 10^(runif(n(), -jitter_dex, jitter_dex)),
+    jy     = 10^(runif(n(), -jitter_dex, jitter_dex)),
+    xh = if_else(
+      is.na(inat_n),
+      epsilon * 10^(runif(n(), 0, floor_jit)),  # nudge off x-floor
+      as.double(inat_n) * jx                    # multiplicative jitter
+    ),
+    yh = if_else(
+      is.na(edd_n),
+      epsilon * 10^(runif(n(), 0, floor_jit)),  # nudge off y-floor
+      as.double(edd_n) * jy                     # multiplicative jitter
+    )
+  )
 
 
+# =======================================================
+# Check to see how many obs removed > 1000 m uncertainty
+# =======================================================
+
+# --- EDDMapS---
+edd_pre_unc <- eddmaps %>%
+  filter(SciName %in% eddmaps_introduced_clean$scientific_name) %>%
+  dplyr::select(SciName, ObsDate, Latitude, Longitude, CoordAcc) %>%
+  filter(!is.na(Latitude) & !is.na(Longitude)) %>%
+  mutate(
+    coordinateUncertaintyInMeters = as.numeric(as.character(CoordAcc))
+  )
 
 
+filtered_data_eddmaps <- edd_pre_unc %>%
+  filter(is.na(coordinateUncertaintyInMeters) | coordinateUncertaintyInMeters <= 1000) %>%
+  dplyr::select(-CoordAcc)
+
+
+edd_removed_summary <- tibble(
+  dataset = "EDDMapS",
+  n_before = nrow(edd_pre_unc),
+  n_after  = nrow(filtered_data_eddmaps),
+  removed  = n_before - n_after,
+  pct_removed = round(100 * removed / n_before, 2),
+  
+  # Diagnostics from PRE data:
+  n_uncertainty_NA = sum(is.na(edd_pre_unc$coordinateUncertaintyInMeters)),
+  n_uncertainty_gt1000 = sum(edd_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  # With NA-kept logic:
+  removed_uncertainty_NA = 0,
+  removed_uncertainty_gt1000 = sum(edd_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  
+  # Get number of species before and after
+  n_sp_before = length(unique(edd_pre_unc$SciName)),
+  n_sp_after = length(unique(filtered_data_eddmaps$SciName))
+)
+
+edd_removed_summary
+
+
+# --- iNat ---
+iNat_pre_unc <- iNat %>%
+  filter(species %in% iNaturalist_introduced$scientific_name) %>%
+  filter(!(species %in% c(
+    "Anaxyrus fowleri", "Desmognathus conanti", "Pseudotriton ruber",
+    "Eurycea cirrigera", "Eurycea guttolineata", "Eretmochelys imbricata",
+    "Incilius nebulifer", "Lampropeltis rhombomaculata", "Lepidochelys kempii",
+    "Lithobates virgatipes"
+  ))) %>%
+  dplyr::select(
+    species, decimalLatitude, decimalLongitude, day, month, year,
+    coordinateUncertaintyInMeters
+  ) %>%
+  filter(!is.na(decimalLatitude) & !is.na(decimalLongitude))
+
+
+filtered_data_iNat <- iNat_pre_unc %>%
+  filter(is.na(coordinateUncertaintyInMeters) | coordinateUncertaintyInMeters <= 1000)
+
+
+inat_removed_summary <- tibble(
+  dataset = "iNaturalist",
+  n_before = nrow(iNat_pre_unc),
+  n_after  = nrow(filtered_data_iNat),
+  removed  = n_before - n_after,
+  pct_removed = round(100 * removed / n_before, 2),
+  
+  # Diagnostics about what existed in the PRE data:
+  n_uncertainty_NA = sum(is.na(iNat_pre_unc$coordinateUncertaintyInMeters)),
+  n_uncertainty_gt1000 = sum(iNat_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  # With NA-kept logic, these are not removed due to uncertainty:
+  removed_uncertainty_NA = 0,
+  removed_uncertainty_gt1000 = sum(iNat_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  # Get number of species before and after
+  n_sp_before = length(unique(iNat_pre_unc$species)),
+  n_sp_after = length(unique(filtered_data_iNat$species))
+)
+
+inat_removed_summary
 
 # ============================================================
 # Obj 1 Results stats: Top 5 species + singletons
@@ -422,10 +619,89 @@ cat("  iNaturalist singletons (N==1): ", inat_singletons_n, "\n")
 cat("  EDDMapS singletons (N==1):     ", edd_singletons_n, "\n")
 
 
+# =======================================================
+# Check to see how many obs removed > 1000 m uncertainty
+# =======================================================
+
+# --- EDDMapS---
+edd_pre_unc <- eddmaps %>%
+  filter(SciName %in% eddmaps_introduced_clean$scientific_name) %>%
+  dplyr::select(SciName, ObsDate, Latitude, Longitude, CoordAcc) %>%
+  filter(!is.na(Latitude) & !is.na(Longitude)) %>%
+  mutate(
+    coordinateUncertaintyInMeters = as.numeric(as.character(CoordAcc))
+  )
 
 
+filtered_data_eddmaps <- edd_pre_unc %>%
+  filter(is.na(coordinateUncertaintyInMeters) | coordinateUncertaintyInMeters <= 1000) %>%
+  dplyr::select(-CoordAcc)
 
 
+edd_removed_summary <- tibble(
+  dataset = "EDDMapS",
+  n_before = nrow(edd_pre_unc),
+  n_after  = nrow(filtered_data_eddmaps),
+  removed  = n_before - n_after,
+  pct_removed = round(100 * removed / n_before, 2),
+  
+  # Diagnostics from PRE data:
+  n_uncertainty_NA = sum(is.na(edd_pre_unc$coordinateUncertaintyInMeters)),
+  n_uncertainty_gt1000 = sum(edd_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  # With NA-kept logic:
+  removed_uncertainty_NA = 0,
+  removed_uncertainty_gt1000 = sum(edd_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  
+  # Get number of species before and after
+  n_sp_before = length(unique(edd_pre_unc$SciName)),
+  n_sp_after = length(unique(filtered_data_eddmaps$SciName))
+)
+
+edd_removed_summary
+
+# --- iNat ---
+iNat_pre_unc <- iNat %>%
+  filter(species %in% iNaturalist_introduced$scientific_name) %>%
+  filter(!(species %in% c(
+    "Anaxyrus fowleri", "Desmognathus conanti", "Pseudotriton ruber",
+    "Eurycea cirrigera", "Eurycea guttolineata", "Eretmochelys imbricata",
+    "Incilius nebulifer", "Lampropeltis rhombomaculata", "Lepidochelys kempii",
+    "Lithobates virgatipes"
+  ))) %>%
+  dplyr::select(
+    species, decimalLatitude, decimalLongitude, day, month, year,
+    coordinateUncertaintyInMeters
+  ) %>%
+  filter(!is.na(decimalLatitude) & !is.na(decimalLongitude))
+
+
+filtered_data_iNat <- iNat_pre_unc %>%
+  filter(is.na(coordinateUncertaintyInMeters) | coordinateUncertaintyInMeters <= 1000)
+
+
+inat_removed_summary <- tibble(
+  dataset = "iNaturalist",
+  n_before = nrow(iNat_pre_unc),
+  n_after  = nrow(filtered_data_iNat),
+  removed  = n_before - n_after,
+  pct_removed = round(100 * removed / n_before, 2),
+  
+  # Diagnostics about what existed in the PRE data:
+  n_uncertainty_NA = sum(is.na(iNat_pre_unc$coordinateUncertaintyInMeters)),
+  n_uncertainty_gt1000 = sum(iNat_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  # With NA-kept logic, these are not removed due to uncertainty:
+  removed_uncertainty_NA = 0,
+  removed_uncertainty_gt1000 = sum(iNat_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
+  
+  # Get number of species before and after
+  n_sp_before = length(unique(iNat_pre_unc$species)),
+  n_sp_after = length(unique(filtered_data_iNat$species))
+)
+
+inat_removed_summary
 
 # ========================
 # Obj 1: How many Reps and Amphib per platform
@@ -512,29 +788,6 @@ both_species_counts <- species_groups %>%
   mutate(prop_species = n_species / sum(n_species))
 
 both_species_counts
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## Check for species traits ------------------------------------------------
 
@@ -863,8 +1116,10 @@ ggsave("Figures/species_traists_platform.jpeg", height=8, width=8, units="in")
 
 
 
-
-### Density Histogram for Population Density / Urbanization Proxy (Obj 2.)
+# ============================================================
+# Objective 2:
+# To understand the differences in data availability as a function of population density
+# ============================================================
 
 # -----------------------------
 # 1) Apply 1000 m uncertainty filter (Obj 2 only)
@@ -1018,9 +1273,13 @@ print(p_density)
 
 
 
-# =============================================================================
 
-### MCP analysis (Obj 3.)
+
+# ============================================================
+# Objective 3:
+# To understand the overall distribution (i.e., range size) of non-native species across Florida
+# ============================================================
+
 library(dplyr)
 library(tidyr)
 library(sp)
@@ -1256,9 +1515,6 @@ ggplot(long_data, aes(x = mcp_area)) +
 ggsave("Figures/mcp_hist.jpeg", height=4, width=4, units="in")
 
 
-
-library(lme4)
-
 # Mixed effects model with species as random effect
 mcp_mixed_model <- lmer(log_mcp_area ~ platform + (1|Species), data = long_data)
 summary(mcp_mixed_model)
@@ -1422,246 +1678,351 @@ mcp_obs_plot <- ggplot(plot_data_combined, aes(x = obs_count, y = mcp_area)) +
 print(mcp_obs_plot)
 
 
+# =========================================================
+# Grid-based range analysis over Florida (sf-based workflow)
+# =========================================================
+library(dplyr)
+library(tidyr)
+library(sf)
+library(units)
+library(ggplot2)
+library(fitdistrplus)
+library(tigris)    
+library(DHARMa)
+library(glmmTMB)
+options(tigris_use_cache = TRUE)
 
 
+# -----------------------------
+# 0) Inputs (apply 1000 m filter HERE for this script)
+# -----------------------------
+# Use the Florida-filtered tables as the base (the ones you already have)
+# and apply the same coordinate uncertainty filter used elsewhere.
 
-
-
-
-
-
-
-
-
-
-
-# ==============================================
-# Figure_1 Scatter Plot 
-# ==============================================
-
-# ------- Build per-species counts (Florida-filtered) -------
-iNat_counts <- filtered_data_iNat_florida %>%
-  count(species, name = "inat_n")
-
-EDD_counts <- filtered_data_eddmaps_florida %>%
-  count(species, name = "edd_n")
-
-counts <- full_join(iNat_counts, EDD_counts, by = "species")
-
-# ------- Assign platform category + build plotting coords -------
-epsilon <- 0.5  # axis floor for "absent" side on log scale
-
-plot_df <- counts %>%
-  mutate(
-    platform = case_when(
-      !is.na(inat_n) & !is.na(edd_n) ~ "Both platforms",
-      !is.na(inat_n) &  is.na(edd_n) ~ "iNaturalist only",
-      is.na(inat_n) & !is.na(edd_n) ~ "EDDMapS only",
-      TRUE ~ NA_character_
-    )
-  ) %>%
-  filter(!is.na(platform)) %>%
-  mutate(
-    x_plot = if_else(is.na(inat_n), epsilon, as.double(inat_n)),
-    y_plot = if_else(is.na(edd_n), epsilon, as.double(edd_n))
-  )
-
-# ------- Jitter settings (multiplicative in log space) -------
-set.seed(42)
-jitter_dex <- 0.05   # ±0.05 log10 units ≈ ±12%
-floor_jit  <- 0.10   # lift off axis floor (log10 units)
-
-plot_df <- plot_df %>%
-  mutate(
-    jx = 10^(runif(n(), -jitter_dex, jitter_dex)),
-    jy = 10^(runif(n(), -jitter_dex, jitter_dex)),
-    xj = if_else(x_plot == epsilon, epsilon * 10^(runif(n(), 0, floor_jit)), x_plot * jx),
-    yj = if_else(y_plot == epsilon, epsilon * 10^(runif(n(), 0, floor_jit)), y_plot * jy)
-  )
-
-# ------- Plot (regression line ONLY on "Both platforms") -------
-Fig_1_Line_with_platforms <- ggplot() +
-  geom_point(
-    data = plot_df,
-    aes(x = xj, y = yj, color = platform),
-    size = 2.6, alpha = 0.9
-  ) +
-  geom_smooth(
-    data = plot_df %>% filter(platform == "Both platforms"),
-    aes(x = x_plot, y = y_plot),
-    method = "lm", se = TRUE, color = "black"
-  ) +
-  scale_x_log10(limits = c(epsilon, NA)) +
-  scale_y_log10(limits = c(epsilon, NA)) +
-  scale_color_manual(
-    values = c(
-      "Both platforms" = "#7FB069",
-      "iNaturalist only" = "#A7FD25",
-      "EDDMapS only"     = "#FD7B25"
-    ),
-    name = NULL
-  ) +
-  labs(
-    x = "iNaturalist observations",
-    y = "EDDMapS observations"
-  ) +
-  theme_classic() +
-  theme(legend.position = "none")   # <- drop legend
-
-Fig_1_Line_with_platforms
-
-
-
-
-
-
-
-
-
-
-# ---- Choose species to highlight ----
-species_to_highlight <- c("Graptemys pseudogeographica", "Xenopus laevis")
-
-# Build a small table of those species from your per-species counts
-hl_raw <- counts %>%
-  filter(species %in% species_to_highlight)
-
-# If none found, bail early (optional)
-if (nrow(hl_raw) == 0) message("None of the highlight species were found in 'counts'.")
-
-# Compute plotted positions with same floor & multiplicative jitter you used above
-set.seed(101)  # separate seed for reproducible highlight positions
-hl_points <- hl_raw %>%
-  mutate(
-    x_plot = if_else(is.na(inat_n), epsilon, as.double(inat_n)),
-    y_plot = if_else(is.na(edd_n),  epsilon, as.double(edd_n)),
-    jx     = 10^(runif(n(), -jitter_dex, jitter_dex)),
-    jy     = 10^(runif(n(), -jitter_dex, jitter_dex)),
-    xh = if_else(
-      is.na(inat_n),
-      epsilon * 10^(runif(n(), 0, floor_jit)),  # nudge off x-floor
-      as.double(inat_n) * jx                    # multiplicative jitter
-    ),
-    yh = if_else(
-      is.na(edd_n),
-      epsilon * 10^(runif(n(), 0, floor_jit)),  # nudge off y-floor
-      as.double(edd_n) * jy                     # multiplicative jitter
-    )
-  )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# =======================================================
-# Check to see how many obs removed > 1000 m uncertainty
-# =======================================================
-
-# --- EDDMapS---
-edd_pre_unc <- eddmaps %>%
-  filter(SciName %in% eddmaps_introduced_clean$scientific_name) %>%
-  dplyr::select(SciName, ObsDate, Latitude, Longitude, CoordAcc) %>%
-  filter(!is.na(Latitude) & !is.na(Longitude)) %>%
-  mutate(
-    coordinateUncertaintyInMeters = as.numeric(as.character(CoordAcc))
-  )
-
-
-filtered_data_eddmaps <- edd_pre_unc %>%
-  filter(is.na(coordinateUncertaintyInMeters) | coordinateUncertaintyInMeters <= 1000) %>%
-  dplyr::select(-CoordAcc)
-
-
-edd_removed_summary <- tibble(
-  dataset = "EDDMapS",
-  n_before = nrow(edd_pre_unc),
-  n_after  = nrow(filtered_data_eddmaps),
-  removed  = n_before - n_after,
-  pct_removed = round(100 * removed / n_before, 2),
-  
-  # Diagnostics from PRE data:
-  n_uncertainty_NA = sum(is.na(edd_pre_unc$coordinateUncertaintyInMeters)),
-  n_uncertainty_gt1000 = sum(edd_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
-  
-  # With NA-kept logic:
-  removed_uncertainty_NA = 0,
-  removed_uncertainty_gt1000 = sum(edd_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
-  
-  
-  # Get number of species before and after
-  n_sp_before = length(unique(edd_pre_unc$SciName)),
-  n_sp_after = length(unique(filtered_data_eddmaps$SciName))
-)
-
-edd_removed_summary
-
-
-# --- iNat ---
-iNat_pre_unc <- iNat %>%
-  filter(species %in% iNaturalist_introduced$scientific_name) %>%
-  filter(!(species %in% c(
-    "Anaxyrus fowleri", "Desmognathus conanti", "Pseudotriton ruber",
-    "Eurycea cirrigera", "Eurycea guttolineata", "Eretmochelys imbricata",
-    "Incilius nebulifer", "Lampropeltis rhombomaculata", "Lepidochelys kempii",
-    "Lithobates virgatipes"
-  ))) %>%
-  dplyr::select(
-    species, decimalLatitude, decimalLongitude, day, month, year,
-    coordinateUncertaintyInMeters
-  ) %>%
-  filter(!is.na(decimalLatitude) & !is.na(decimalLongitude))
-
-
-filtered_data_iNat <- iNat_pre_unc %>%
+inat_grid <- filtered_data_iNat_florida2 %>%
   filter(is.na(coordinateUncertaintyInMeters) | coordinateUncertaintyInMeters <= 1000)
 
+edd_grid <- filtered_data_eddmaps_florida2 %>%
+  filter(is.na(coordinateUncertaintyInMeters) | coordinateUncertaintyInMeters <= 1000)
 
-inat_removed_summary <- tibble(
-  dataset = "iNaturalist",
-  n_before = nrow(iNat_pre_unc),
-  n_after  = nrow(filtered_data_iNat),
-  removed  = n_before - n_after,
-  pct_removed = round(100 * removed / n_before, 2),
+stopifnot(all(c("species","Latitude","Longitude") %in% names(inat_grid)))
+stopifnot(all(c("species","Latitude","Longitude") %in% names(edd_grid)))
+
+
+# -----------------------------
+# 1) Florida polygon (equal-area)
+# -----------------------------
+# Option A (auto): use tigris to get Florida
+fl_wgs84 <- states(cb = TRUE, year = 2023) |>
+  filter(STUSPS == "FL") |>
+  st_as_sf()
+
+# Option B (manual): if you already have a Florida shapefile/polygon in WGS84:
+# fl_wgs84 <- st_read("path/to/florida_boundary.shp")
+
+# Equal-area (Albers) CRS for North America (meters)
+ea_crs <- st_crs("+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-84 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
+fl_ea  <- st_transform(fl_wgs84, ea_crs)
+
+# -----------------------------
+# 2) Build grid (fishnet) over Florida and mask
+# -----------------------------
+# Choose either a cell WIDTH (km) or a target CELL AREA (km^2). Here we use width:
+cell_width_km <- 10  # <- change this to 5, 10, 50, etc.
+cell_width_m  <- cell_width_km * 1000
+
+# Create grid covering Florida bbox in EA CRS, then clip to Florida polygon
+grid_all   <- st_make_grid(fl_ea, cellsize = cell_width_m, square = TRUE)
+grid_ea    <- st_intersection(st_as_sf(grid_all), fl_ea)  # mask to FL
+grid_ea$cell_id <- seq_len(nrow(grid_ea))
+grid_ea$cell_area_km2 <- as.numeric(set_units(st_area(grid_ea), km^2))
+
+# -----------------------------
+# 3) Convert points → sf and project to equal-area
+# -----------------------------
+to_points_sf <- function(df) {
+  st_as_sf(df,
+           coords = c("Longitude", "Latitude"),
+           crs = 4326, remove = FALSE) |>
+    st_transform(ea_crs)
+}
+
+inat_pts_ea    <- to_points_sf(inat_grid) |> mutate(platform = "iNaturalist")
+eddmaps_pts_ea <- to_points_sf(edd_grid)  |> mutate(platform = "EDDMapS")
+
+
+# (Optional) drop exact duplicate coordinates within species × platform to reduce bias
+dedupe_points <- function(sf_pts) {
+  sf_pts |>
+    mutate(x = st_coordinates(geometry)[,1],
+           y = st_coordinates(geometry)[,2]) |>
+    distinct(platform, species, x, y, .keep_all = TRUE) |>
+    dplyr::select(-x, -y)
+}
+inat_pts_ea    <- dedupe_points(inat_pts_ea)
+eddmaps_pts_ea <- dedupe_points(eddmaps_pts_ea)
+
+# -----------------------------
+# 4) Join points to grid cells
+# -----------------------------
+# Return occupied cells per species × platform with area (km^2)
+cells_by_species <- function(pts, grid) {
+  # spatial join: each point inherits a cell_id
+  pts_in <- st_join(pts, grid |> dplyr::select(cell_id, cell_area_km2), left = FALSE)  # keep only points that hit FL grid
+  if (nrow(pts_in) == 0) return(tibble())
   
-  # Diagnostics about what existed in the PRE data:
-  n_uncertainty_NA = sum(is.na(iNat_pre_unc$coordinateUncertaintyInMeters)),
-  n_uncertainty_gt1000 = sum(iNat_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
-  
-  # With NA-kept logic, these are not removed due to uncertainty:
-  removed_uncertainty_NA = 0,
-  removed_uncertainty_gt1000 = sum(iNat_pre_unc$coordinateUncertaintyInMeters > 1000, na.rm = TRUE),
-  
-  # Get number of species before and after
-  n_sp_before = length(unique(iNat_pre_unc$species)),
-  n_sp_after = length(unique(filtered_data_iNat$species))
+  pts_in |>
+    st_drop_geometry() |>
+    group_by(platform, species, cell_id) |>
+    summarise(n_obs = n(), cell_area_km2 = first(cell_area_km2), .groups = "drop_last") |>
+    summarise(
+      occupied_cells = n(),
+      area_km2 = sum(cell_area_km2, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
+
+inat_cells    <- cells_by_species(inat_pts_ea, grid_ea)
+eddmaps_cells <- cells_by_species(eddmaps_pts_ea, grid_ea)
+
+# Observation tallies per species × platform (for plotting covariate)
+obs_counts <- bind_rows(
+  inat_pts_ea    |> st_drop_geometry() |> count(platform, species, name = "obs_count"),
+  eddmaps_pts_ea |> st_drop_geometry() |> count(platform, species, name = "obs_count")
 )
 
-inat_removed_summary
+# Combine platform summaries into wide table
+grid_area_by_species <- full_join(
+  inat_cells |> rename(iNat_area_km2 = area_km2, iNat_cells = occupied_cells) |> mutate(platform = "iNaturalist"),
+  eddmaps_cells |> rename(EDD_area_km2 = area_km2, EDD_cells = occupied_cells) |> mutate(platform = "EDDMapS"),
+  by = join_by(species)
+) |>
+  # add obs counts
+  left_join(
+    obs_counts |> tidyr::pivot_wider(names_from = platform, values_from = obs_count,
+                                     values_fill = 0, names_prefix = "n_"),
+    by = "species"
+  ) |>
+  mutate(
+    # Ensure NAs are zeros for areas where absent
+    iNat_area_km2 = replace_na(iNat_area_km2, 0),
+    EDD_area_km2  = replace_na(EDD_area_km2, 0),
+    iNat_cells    = replace_na(iNat_cells, 0L),
+    EDD_cells     = replace_na(EDD_cells, 0L),
+    n_iNaturalist = replace_na(n_iNaturalist, 0L),
+    n_EDDMapS     = replace_na(n_EDDMapS, 0L),
+    combined_obs  = n_iNaturalist + n_EDDMapS
+  )
+
+# Optionally require a minimum number of occupied cells per platform (stability)
+min_cells <- 1  # set to 2–3 if you want stricter ranges
+grid_area_by_species <- grid_area_by_species |>
+  mutate(
+    iNat_area_km2 = ifelse(iNat_cells >= min_cells, iNat_area_km2, NA_real_),
+    EDD_area_km2  = ifelse(EDD_cells  >= min_cells, EDD_area_km2,  NA_real_)
+  )
+
+# -----------------------------
+# 5) Comparison metrics
+# -----------------------------
+plot_data <- grid_area_by_species |>
+  filter(!is.na(iNat_area_km2) & !is.na(EDD_area_km2)) |>
+  mutate(
+    comparison_score = (EDD_area_km2 - iNat_area_km2) / (EDD_area_km2 + iNat_area_km2),
+    log_ratio        = log2((EDD_area_km2 + 1e-9) / (iNat_area_km2 + 1e-9)) # tiny offset for safety
+  ) |>
+  arrange(comparison_score)
+
+# -----------------------------
+# 6) Figure_S14
+# -----------------------------
+p1 <- ggplot(plot_data,
+             aes(x = comparison_score, y = reorder(species, comparison_score))) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50", size = 0.5) +
+  geom_point(aes(size = combined_obs, color = abs(comparison_score)), alpha = 0.85) +
+  scale_color_gradient(low = "blue", high = "red", name = "Disparity") +
+  scale_size_continuous(name = "Total Observations") +
+  scale_x_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.5),
+                     labels = c("iNaturalist\nlarger", "-0.5", "No Difference", "0.5", "EDDMapS\nlarger")) +
+  scale_y_discrete(labels = function(x) lapply(x, function(y) bquote(italic(.(y))))) +
+  labs(x = "Relative Grid-Range Size Comparison Score",
+       y = "Species") +
+  theme_classic() +
+  theme(axis.text.y = element_text(size = 8),
+        panel.grid.major.y = element_line(color = "gray90"),
+        panel.grid.minor = element_blank(),
+        legend.position = "right")
+print(p1)
+
+# -----------------------------
+# 7) Figure_S13
+# -----------------------------
+long_for_plot <- grid_area_by_species |>
+  dplyr::select(species, iNat_area_km2, EDD_area_km2, n_iNaturalist, n_EDDMapS) |>
+  pivot_longer(c(iNat_area_km2, EDD_area_km2), names_to = "platform", values_to = "grid_area") |>
+  mutate(
+    Platform = ifelse(platform == "iNat_area_km2", "iNaturalist", "EDDMapS"),
+    obs_count = ifelse(Platform == "iNaturalist", n_iNaturalist, n_EDDMapS)
+  ) |>
+  filter(!is.na(grid_area), obs_count > 0)
+
+p2 <- ggplot(long_for_plot, aes(x = obs_count, y = grid_area)) +
+  geom_point(aes(color = Platform), alpha = 0.7, size = 2.6) +
+  geom_smooth(method = "lm", se = TRUE, alpha = 0.2, size = 1.1, color = "black") +
+  scale_x_log10() +
+  scale_y_log10(breaks = c(1,10,100,1000,10000,100000),
+                labels = c("1","10","100","1,000","10,000","100,000")) +
+  scale_color_manual(values = c("EDDMapS" = "#FD7B25", "iNaturalist" = "#A7FD25")) +
+  labs(x = "Number of Observations (log scale)",
+       y = paste0("Grid-Range Area (km²; cell width ", cell_width_km, " km; log scale)"),
+       color = "Platform") +
+  theme_classic() +
+  annotation_logticks(sides = "bl")
+print(p2)
 
 
+# -----------------------------
+# 1) Prepare long-format data
+# -----------------------------
+grid_long <- grid_area_by_species |>
+  dplyr::select(Species = species,
+                iNat_area_km2, EDD_area_km2,
+                n_iNaturalist, n_EDDMapS) |>
+  tidyr::pivot_longer(
+    cols = c(iNat_area_km2, EDD_area_km2),
+    names_to = "platform",
+    values_to = "grid_area"
+  ) |>
+  mutate(
+    Platform = ifelse(platform == "iNat_area_km2", "iNaturalist", "EDDMapS"),
+    obs_count = ifelse(Platform == "iNaturalist", n_iNaturalist, n_EDDMapS),
+    log_grid_area = log10(grid_area),
+    log_obs_count = log10(obs_count)
+  ) |>
+  filter(!is.na(log_grid_area), !is.na(log_obs_count), obs_count > 0)
+
+# -----------------------------
+# 2) Base GLM: area ~ platform + log(obs)
+# -----------------------------
+
+# Figure_S9
+ggplot(grid_long, aes(x = grid_area)) +
+  geom_histogram(position = "identity", alpha = 0.35, bins = 50) +
+  labs(x = "Grid-Range Area (km²)",
+       y = "Count") +
+  theme_classic()
+
+ggsave("Figures/grid_hist.jpeg", height=4, width=4, units="in")
+
+ggplot(grid_long, aes(x = obs_count)) +
+  geom_histogram(position = "identity", alpha = 0.35, bins = 50) +
+  labs(x = "Number of Observations",
+       y = "Count") +
+  theme_classic()
+
+ggsave("Figures/grid_hist_obs.jpeg", height=4, width=4, units="in")
+
+# check the response distribution
+hist(grid_long$log_grid_area)
+hist(grid_long$grid_area)
+
+fit_norm <- fitdist(grid_long$log_grid_area, "norm")
+fit_lnorm <- fitdist(grid_long$log_grid_area, "lnorm")
+fit_gamma <- fitdist(grid_long$log_grid_area, "gamma")
+
+gofstat(list(fit_norm, fit_lnorm, fit_gamma))
+
+grid_obs_model <- glm(log_grid_area ~ Platform + log_obs_count, data = grid_long)
+summary(grid_obs_model)
 
 
+# Figure_S10
+png("Figures/DHARMa_grid_log_area_log_obs.png", width = 2000, height = 1500, res = 300)
+grid1 <- simulateResiduals(grid_obs_model)
+plot(grid1)
+dev.off()
+
+grid_obs_model2 <- glm(grid_area ~ Platform + log_obs_count, data = grid_long)
+summary(grid_obs_model2)
+
+# Figure_S10
+png("Figures/DHARMa_grid_area_log_obs.png", width = 2000, height = 1500, res = 300)
+grid2 <- simulateResiduals(grid_obs_model2)
+plot(grid2)
+dev.off()
+
+grid_obs_model3 <- glm(grid_area ~ Platform + log_obs_count, family=Gamma(link="log"), data = grid_long)
+summary(grid_obs_model3)
+
+# Figure_S10
+png("Figures/DHARMa_grid_area_log_obs_gamma.png", width = 2000, height = 1500, res = 300)
+grid3 <- simulateResiduals(grid_obs_model3)
+plot(grid3)
+dev.off()
+
+grid_obs_model4 <- glm(log_grid_area ~ Platform + obs_count, data = grid_long)
+summary(grid_obs_model4)
+
+# Figure_S10
+png("Figures/DHARMa_log_grid_area_obs.png", width = 2000, height = 1500, res = 300)
+grid4 <- simulateResiduals(grid_obs_model4)
+plot(grid4)
+
+grid_obs_model5 <- glm(grid_area ~ Platform + obs_count, family=Gamma(link="log"), data = grid_long)
+summary(grid_obs_model5)
+
+png("Figures/DHARMa_grid_area_obs_gamma.png", width = 2000, height = 1500, res = 300)
+grid5 <- simulateResiduals(grid_obs_model5)
+plot(grid5)
+dev.off()
+
+# model testing
+plot(mcp_obs_model$fitted.values, resid(mcp_obs_model))
+abline(h = 0, lty = 2)
+
+qqnorm(resid(mcp_obs_model))
+qqline(resid(mcp_obs_model))
+
+# FINAL model
+grid_obs_model <- glm(log(grid_area) ~ Platform + log_obs_count, family=gaussian, data = grid_long)
+summary(grid_obs_model)
+
+# -----------------------------
+# 3) Mixed-effects model (species random effect)
+# -----------------------------
+grid_obs_mixed_model <- lmer(log_grid_area ~ Platform + log_obs_count + (1|Species), data = grid_long)
+summary(grid_obs_mixed_model)
+
+# check singular fits
+lme4::isSingular(grid_obs_mixed_model)
+
+png("Figures/DHARMa_grid_area_mm.png", width = 2000, height = 1500, res = 300)
+grid_mm <- simulateResiduals(grid_obs_mixed_model)
+plot(grid_mm)
+dev.off()
 
 
+# model testing
+plot(mcp_obs_mixed_model)
 
+qqnorm(residuals(mcp_obs_mixed_model))
+qqline(residuals(mcp_obs_mixed_model))
 
+qqnorm(ranef(mcp_obs_mixed_model)$Species[,1])
+qqline(ranef(mcp_obs_mixed_model)$Species[,1])
 
+# -----------------------------
+# 4) Interaction test
+# -----------------------------
+grid_interaction_model <- glm(log_grid_area ~ Platform * log_obs_count, data = grid_long)
+summary(grid_interaction_model)
 
+# model testing
+plot(mcp_obs_model$fitted.values, resid(mcp_obs_model))
+abline(h = 0, lty = 2)
 
+qqnorm(resid(mcp_obs_model))
+qqline(resid(mcp_obs_model))
 
-
-
-
+# Likelihood ratio test: does interaction improve fit?
+anova(grid_obs_model, grid_interaction_model)
