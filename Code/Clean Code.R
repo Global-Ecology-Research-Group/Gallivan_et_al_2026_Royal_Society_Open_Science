@@ -269,7 +269,7 @@ Fig_1_Line <- ggplot(iNatandEddMap_both, aes(x = inat_number_of_obs, y = eddmaps
 
 Fig_1_Line
 
-# make histogram of the data
+# make histogram of the data (Figure_S1)
 iNatandEddMap_both %>%
   pivot_longer(
     cols = c(inat_number_of_obs, eddmaps_number_of_obs),
@@ -289,7 +289,6 @@ iNatandEddMap_both %>%
        y = "Count",
        fill = "Platform") +
   theme_classic()
-
 
 ggsave("Figures/hist_num_of_obs.jpeg", height=5, width=6, units="in")
 
@@ -342,7 +341,7 @@ cat("Species present only in EDDMapS:",
 write_csv(presence_df, "Data/species_presence_up.csv")
 
 # =========================
-# Pie chart (Uses presence_df)
+# Pie chart (Uses presence_df) Figure_1
 # =========================
 
 presence_summary <- presence_df %>%
@@ -629,7 +628,7 @@ trait_inat_eddmaps_clean <- trait_inat_eddmaps_clean %>%
     prop_ratio = log10(inat_prop / eddmaps_prop)
   )
 
-# make a histogram of data
+# make a histogram of data (Figure_S2)
 ggplot(trait_inat_eddmaps_clean, aes(x = prop_ratio)) +
   geom_histogram(position = "identity", alpha = 0.35, bins = 50) +
   labs(x = "Log-proportional ratio of observations\n(iNaturalist / EDDMapS)",
@@ -658,11 +657,13 @@ ggsave("Figures/body-mass-hist.jpeg", height=4, width=4, units="in")
 glm_diurnal <- glm(prop_ratio ~ 1, data = subset(trait_inat_eddmaps_clean, `Active time` == "Diurnal"))
 summary(glm_diurnal)
 
+# Figure_S3
 png("Figures/DHARMa_residuals_diurnal.png", width = 2000, height = 1500, res = 300)
 res <- simulateResiduals(glm_diurnal)
 plot(res)
 dev.off()
 
+# Figure_S3
 glm_nocturnal <- glm(prop_ratio ~ 1, data = subset(trait_inat_eddmaps_clean, `Active time` == "Nocturnal"))
 summary(glm_nocturnal)
 
@@ -671,6 +672,7 @@ res <- simulateResiduals(glm_nocturnal)
 plot(res)
 dev.off()
 
+# Figure_S3
 glm_cathemeral <- glm(prop_ratio ~ 1, data = subset(trait_inat_eddmaps_clean, `Active time` == "Cathemeral"))
 summary(glm_cathemeral)
 
@@ -709,6 +711,7 @@ coefs <- coefs %>%
 
 
 # log-transform body size since itis highly skewed
+# Figure_S3
 trait_inat_eddmaps_clean$log_body_size <- log10(trait_inat_eddmaps_clean$`Maximum body mass (g)`)
 
 body_mass_glm <- glm(prop_ratio ~ log_body_size, data=trait_inat_eddmaps_clean, family = gaussian)
@@ -786,8 +789,8 @@ habitats_filtered <- habitat_counts %>%
   pull(habitat)
 habitats_filtered
 
-# I am also going to remove deser
 
+# Figure_S3
 habitat_glm <- glm(prop_ratio ~ Savanna + Forest + Shrubland + Grassland + Wetlands + Rocky, 
                    data=trait_habitat, family = gaussian)
 summary(habitat_glm)
@@ -829,6 +832,7 @@ coefs <- tibble(
 )
 
 # Compute 95% confidence intervals
+# Figure_2
 coefs <- coefs %>%
   mutate(
     lower = Estimate - 1.96*SE,
@@ -906,6 +910,7 @@ PopData_obj2 <- PopData_obj2 %>%
 # -----------------------------
 # 4) Visual checks (reviewer-requested)
 #    A) Distribution (raw shown on log10 x-axis; log shown directly)
+# Figure_S5
 # -----------------------------
 p_hist_raw <- ggplot(PopData_obj2, aes(x = PopDensity, fill = Source)) +
   geom_histogram(position = "identity", alpha = 0.35, bins = 50) +
@@ -960,6 +965,8 @@ m_log  <- glm(is_iNat ~ LogPopDensity, family = binomial, data = PopData_obj2)
 
 AIC(m_raw, m_log)
 
+# Figure_S5
+
 png("Figures/DHARMa_residuals_raw.png", width = 2000, height = 1500, res = 300)
 res <- simulateResiduals(m_raw)
 plot(res)
@@ -989,6 +996,7 @@ cat(sprintf("  AIC (log PopDensity): %.2f\n", AIC(m_logit)))
 
 # -----------------------------
 # 7) Manuscript figure: density curves (same colors as before)
+# Figure_3
 # -----------------------------
 p_density <- ggplot(PopData_obj2, aes(x = PopDensity, fill = Source)) +
   geom_density(alpha = 0.35) +
@@ -1001,7 +1009,7 @@ p_density <- ggplot(PopData_obj2, aes(x = PopDensity, fill = Source)) +
 
 print(p_density)
 
-# So in manuscript we would explain that we did the log transformation for interpritability, not for an "assumption" requirement.
+
 
 
 
@@ -1170,10 +1178,9 @@ plot_data <- mcp_results_by_species %>%
 # Add row numbers for ordering on the y-axis
 plot_data$species_order <- 1:nrow(plot_data)
 
-# Load ggplot2 library
-library(ggplot2)
 
 # Create the comparison plot
+# Figure 4
 mcp_comparison_plot <- ggplot(plot_data, aes(x = comparison_score, y = reorder(Species, comparison_score))) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50", size = 0.5) +
   geom_point(aes(size = Combined_observations, 
@@ -1229,7 +1236,7 @@ long_data <- paired_data %>%
 mcp_platform_model <- glm(log_mcp_area ~ platform, data = long_data)
 summary(mcp_platform_model)
 
-# For visualization
+# Figure_S6
 library(ggplot2)
 ggplot(long_data, aes(x = platform, y = mcp_area)) +
   geom_boxplot() +
@@ -1274,8 +1281,7 @@ long_data <- long_data %>%
     log_obs_count = log10(obs_count)
   )
 
-# Figure_S12
-
+# Figure_S6
 ggplot(long_data, aes(x = obs_count)) +
   geom_histogram(position = "identity", alpha = 0.35, bins = 50) +
   labs(x = "Number of Observations",
@@ -1287,6 +1293,9 @@ ggsave("Figures/obs_hist.jpeg", height=4, width=4, units="in")
 # test different versions of this model
 mcp_obs_model_log <- glm(log_mcp_area ~ platform + log_obs_count, family=gaussian, data = long_data)
 summary(mcp_obs_model_log)
+
+
+# Figure_S7
 
 png("Figures/DHARMa_mcp_log_response.png", width = 2000, height = 1500, res = 300)
 mcp_res <- simulateResiduals(mcp_obs_model_log)
@@ -1367,7 +1376,7 @@ ggplot(long_data, aes(x = log_obs_count, y = log_mcp_area, color = platform)) +
 
 
 
-# Supplemental Figure_S12
+# Supplemental figure for MCP
 
 plot_data_combined <- long_data %>%
   filter(!is.na(mcp_area) & !is.na(obs_count)) %>%
@@ -1427,8 +1436,7 @@ print(mcp_obs_plot)
 
 
 # ==============================================
-# Fig 1 Scatter Plot WITH "Both platforms" + exclusives
-# (uses Florida-filtered dataframes)
+# Figure_1 Scatter Plot 
 # ==============================================
 
 # ------- Build per-species counts (Florida-filtered) -------
@@ -1471,7 +1479,7 @@ plot_df <- plot_df %>%
     yj = if_else(y_plot == epsilon, epsilon * 10^(runif(n(), 0, floor_jit)), y_plot * jy)
   )
 
-# ------- Figure_1 Linegraph -------
+# ------- Plot (regression line ONLY on "Both platforms") -------
 Fig_1_Line_with_platforms <- ggplot() +
   geom_point(
     data = plot_df,
